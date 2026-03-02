@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIK Post-Match Analytics Report vs IK Oddevold</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Light slate background */
+            color: #0f172a;
+        }
+        
+        /* Chart Container Requirements */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+            padding: 1rem;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        .tab-btn.active {
+            border-bottom: 4px solid #eab308; /* AIK Yellow */
+            color: #000;
+            font-weight: 600;
+        }
+        
+        .player-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-yellow-300 selection:text-black">
+
+    <!-- Chosen Palette: AIK Matchday (Slate-50 background, True Black headers, Golden Yellow accents, White cards) -->
+    
+    <!-- Application Structure Plan: 
+         1. Header: High-level match result context.
+         2. Tabbed Navigation: Allows switching between overarching tactical views and specific player micro-stats, preventing information overload.
+         3. "Tactical Overview" View: Shows the flow of the game, xT (Expected Threat) timeline, and team-level strategies.
+         4. "Player Performance & Goals" View: The core requested feature. Breaks down the 3 goals, isolating the specific AIK players involved (Mujanic, Filling, Yohanna, Celina) and visualizing their unique micro-stats (reaction time, pass distance, clock management).
+         Rationale: The source report focuses heavily on distinct phases and specific micro-actions of individual players. A tabbed dashboard lets users consume the narrative of each goal chronologically or jump straight to the player stats they care about. -->
+
+    <!-- Visualization & Content Choices:
+         - Reaction Speed (Mujanic): Horizontal Bar Chart. Goal: Compare reaction times clearly. Justification: Horizontal bars are best for ranking/comparing durations side-by-side. Library: Chart.js.
+         - Expected Threat (xT) Timeline: Line Chart. Goal: Show momentum shifts late in the game. Justification: Line charts intuitively display trends over time. Library: Chart.js.
+         - Build-up Pass Distances (Csongvai/Yohanna): Vertical Bar Chart. Goal: Contrast the massive 42m switch with the 1.5m final assist. Justification: Bars emphasize the extreme difference in magnitudes. Library: Chart.js.
+         - Clock Management (Celina): Doughnut Chart. Goal: Highlight the proportion of time wasted vs a standard play. Justification: Doughnuts are great for showing a part-to-whole or dramatic comparison of a single metric (time). Library: Chart.js.
+         - Player Stat Cards: HTML/Tailwind Grid. Goal: Summarize all extracted player metrics in one readable place. Justification: Textual/numeric data is best read in structured cards.
+         CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <!-- Header -->
+    <header class="bg-black text-white py-8 px-4 sm:px-6 lg:px-8 border-b-4 border-yellow-500">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <p class="text-yellow-400 font-semibold tracking-wider text-sm uppercase mb-1">Svenska Cupen - Group 7 Post-Match Report</p>
+                <h1 class="text-3xl md:text-4xl font-bold">IK Oddevold <span class="text-gray-400 font-normal mx-2">0 - 3</span> AIK</h1>
+                <p class="text-gray-300 mt-2 text-sm max-w-xl">A complete tactical breakdown of AIK's dominant away victory. Featuring advanced player metrics, reaction speeds, and stoppage-time masterclasses.</p>
+            </div>
+            <div class="flex gap-4 text-center">
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="text-2xl font-bold text-yellow-400">0.00</div>
+                    <div class="text-xs text-gray-400 uppercase tracking-wide">Oddevold xG</div>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="text-2xl font-bold text-yellow-400">1.63+</div>
+                    <div class="text-xs text-gray-400 uppercase tracking-wide">AIK Seq. xG</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto">
+            <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn active whitespace-nowrap py-4 px-6 text-gray-600 hover:text-black transition-colors focus:outline-none">
+                Tactical Overview
+            </button>
+            <button onclick="switchTab('players')" id="tab-players" class="tab-btn whitespace-nowrap py-4 px-6 text-gray-600 hover:text-black transition-colors focus:outline-none">
+                AIK Player Stats & Goals
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- SECTION: TACTICAL OVERVIEW -->
+        <section id="view-overview" class="space-y-8 block animate-fade-in">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Match Flow & Tactical Control</h2>
+                <p class="text-gray-600 max-w-3xl">This section visualizes the broader momentum shifts during the match. Despite being the away team, AIK dictated the tempo, utilizing specific flank overloads and absorbing late pressure to strike on the counter. The Expected Threat (xT) chart demonstrates how AIK capitalized on transitional spaces as Oddevold chased the game.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- xT Chart -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-1">Late Game Control (Expected Threat)</h3>
+                    <p class="text-sm text-gray-500 mb-4">As Oddevold pushed for an equalizer (70'-81'), AIK absorbed pressure and exploited gaps, leading to a massive spike in xT culminating in Goal 2.</p>
+                    <div class="chart-container">
+                        <canvas id="xtChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tactical Insights Blocks -->
+                <div class="space-y-4">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 border-l-4 border-l-yellow-500">
+                        <h4 class="font-bold text-gray-900 mb-2">Attacking Origin (Goal 1)</h4>
+                        <p class="text-gray-700 text-sm">AIK deliberately overloaded the right side (the Pavey flank) during the build-up. This horizontal stretch pulled the Oddevold defense out of shape before AIK exploited the central channel for the strike.</p>
+                        <div class="mt-4 flex h-4 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="bg-yellow-400 w-3/5 flex justify-center items-center text-[10px] font-bold">Right Flank Bias</div>
+                            <div class="bg-gray-400 w-2/5"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 border-l-4 border-l-black">
+                        <h4 class="font-bold text-gray-900 mb-2">Stoppage Time Strategy</h4>
+                        <p class="text-gray-700 text-sm">Rather than crossing high into the box during a 92nd-minute corner, AIK opted for a complex short routine. This decision secured possession for an extended period, killing the clock and creating a cleaner edge-of-box shooting angle.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: PLAYER STATS & GOALS -->
+        <section id="view-players" class="space-y-8 hidden animate-fade-in">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">AIK Player Micro-Stats & Goal Breakdown</h2>
+                <p class="text-gray-600 max-w-3xl">A detailed look at the individual brilliance that defined the match. This section isolates the key players involved in all three goals, highlighting extraordinary individual metrics such as sub-second reaction times, pinpoint long-range passing, and high-IQ situational awareness under pressure.</p>
+            </div>
+
+            <!-- Player Data Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                <!-- Mujanic Card -->
+                <div class="player-card bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-lg text-gray-900">Amel Mujanic</h3>
+                        <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">#7</span>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-4">Goalscorer (37')</div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Event</span> <span class="font-medium text-black">Rebound Finish</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Strike Range</span> <span class="font-medium text-black">4.5m</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Seq. xG</span> <span class="font-medium text-black">0.78</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Reaction Time</span> <span class="font-medium text-green-600">~0.3s</span></div>
+                    </div>
+                </div>
+                
+                <!-- Filling Card -->
+                <div class="player-card bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-lg text-gray-900">Kevin Filling</h3>
+                        <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">#29</span>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-4">Goalscorer (81')</div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Event</span> <span class="font-medium text-black">Tap-in Finish</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Finish xG</span> <span class="font-medium text-black">0.85</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Pace</span> <span class="font-medium text-black">Counter Attack</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Shot Dist.</span> <span class="font-medium text-black">< 1.5m</span></div>
+                    </div>
+                </div>
+
+                <!-- Yohanna Card -->
+                <div class="player-card bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all border-b-4 border-b-black">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-lg text-gray-900">Zadok Yohanna</h3>
+                        <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">#36</span>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-4">Playmaker (81')</div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Event</span> <span class="font-medium text-black">Ground Assist</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Pass Range</span> <span class="font-medium text-black">1.5m</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Execution</span> <span class="font-medium text-black">Lying-down pass</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Trait</span> <span class="font-medium text-black">Spatial Awareness</span></div>
+                    </div>
+                </div>
+
+                <!-- Celina Card -->
+                <div class="player-card bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-lg text-gray-900">Bersant Celina</h3>
+                        <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">#10</span>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-4">Goalscorer (92')</div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Event</span> <span class="font-medium text-black">Edge of Box Strike</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Strike Dist.</span> <span class="font-medium text-black">18m</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Tactic</span> <span class="font-medium text-black">Short Corner</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-500">Poss. Held</span> <span class="font-medium text-blue-600">31 seconds</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deep Dives Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Goal 1 Chart -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
+                    <div class="mb-4">
+                        <span class="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded mb-2">37' Goal</span>
+                        <h3 class="text-lg font-bold text-gray-900 leading-tight">Mujanic Reaction Speed</h3>
+                        <p class="text-xs text-gray-500 mt-1">Anticipation allowed Mujanic to react over 2x faster than Oddevold defenders to the loose ball.</p>
+                    </div>
+                    <div class="chart-container flex-grow">
+                        <canvas id="reactionChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Goal 2 Chart -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
+                    <div class="mb-4">
+                        <span class="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded mb-2">81' Goal</span>
+                        <h3 class="text-lg font-bold text-gray-900 leading-tight">Build-up Pass Distances</h3>
+                        <p class="text-xs text-gray-500 mt-1">A goal of extremes: a 42m switch by Csongvai, ending with Yohanna's 1.5m assist from the ground to Filling.</p>
+                    </div>
+                    <div class="chart-container flex-grow">
+                        <canvas id="passChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Goal 3 Chart -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
+                    <div class="mb-4">
+                        <span class="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded mb-2">92' Goal</span>
+                        <h3 class="text-lg font-bold text-gray-900 leading-tight">Celina Clock Management</h3>
+                        <p class="text-xs text-gray-500 mt-1">Seconds drained off the clock using a short corner routine versus a standard direct cross.</p>
+                    </div>
+                    <div class="chart-container flex-grow">
+                        <canvas id="timeChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-black text-gray-400 py-8 text-center text-sm mt-12 border-t border-gray-800">
+        <p>AIK Post-Match Analytics Dashboard | Data Extracted from Source Report</p>
+    </footer>
+
+    <script>
+        // Global Chart Instances
+        let xtChartInstance = null;
+        let reactionChartInstance = null;
+        let passChartInstance = null;
+        let timeChartInstance = null;
+
+        // Chart configuration defaults
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#64748b';
+        Chart.defaults.scale.grid.color = '#f1f5f9';
+
+        // --- Data & Render Functions ---
+
+        function renderOverviewCharts() {
+            if (xtChartInstance) return; // Prevent re-rendering
+
+            const xtCtx = document.getElementById('xtChart').getContext('2d');
+            xtChartInstance = new Chart(xtCtx, {
+                type: 'line',
+                data: {
+                    labels: ['70-73 Min', '74-77 Min', '78-80 Min', '81 Min (Goal)'],
+                    datasets: [
+                        {
+                            label: 'AIK Expected Threat',
+                            data: [0.2, 0.4, 0.8, 1.1],
+                            borderColor: '#eab308', // AIK Yellow
+                            backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#000',
+                            pointRadius: 5
+                        },
+                        {
+                            label: 'Oddevold Expected Threat',
+                            data: [0.1, 0.2, 0.1, 0.05],
+                            borderColor: '#94a3b8', // Gray
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: 1.2, title: { display: true, text: 'Expected Threat (xT)' } }
+                    }
+                }
+            });
+        }
+
+        function renderPlayerCharts() {
+            if (reactionChartInstance) return;
+
+            // 1. Mujanic Reaction Chart
+            const reactionCtx = document.getElementById('reactionChart').getContext('2d');
+            reactionChartInstance = new Chart(reactionCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Amel Mujanic', 'Oddevold CB', 'Oddevold FB'],
+                    datasets: [{
+                        label: 'Reaction Time (Seconds)',
+                        data: [0.3, 0.7, 0.8],
+                        backgroundColor: [
+                            '#eab308', // Yellow for AIK
+                            '#cbd5e1', 
+                            '#94a3b8'
+                        ],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Horizontal bar
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.raw} seconds` } }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, max: 1.0, title: { display: true, text: 'Seconds' } }
+                    }
+                }
+            });
+
+            // 2. Build-up Pass Distances Chart
+            const passCtx = document.getElementById('passChart').getContext('2d');
+            passChartInstance = new Chart(passCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Csongvai Diagonal', 'Geiger Box Entry', 'Yohanna Assist (Ground)'],
+                    datasets: [{
+                        label: 'Distance (Meters)',
+                        data: [42, 15, 1.5],
+                        backgroundColor: '#1e293b', // Slate 800
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.raw} meters` } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Meters' } },
+                        x: {
+                            ticks: {
+                                callback: function(value) {
+                                    // 16-char label wrapping logic
+                                    const label = this.getLabelForValue(value);
+                                    if (label.length > 16) {
+                                        const words = label.split(' ');
+                                        let lines = [];
+                                        let currentLine = '';
+                                        words.forEach(word => {
+                                            if ((currentLine + word).length > 16) {
+                                                lines.push(currentLine.trim());
+                                                currentLine = word + ' ';
+                                            } else {
+                                                currentLine += word + ' ';
+                                            }
+                                        });
+                                        lines.push(currentLine.trim());
+                                        return lines;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 3. Clock Management Doughnut
+            const timeCtx = document.getElementById('timeChart').getContext('2d');
+            timeChartInstance = new Chart(timeCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['AIK Short Routine', 'Standard Corner (Est.)'],
+                    datasets: [{
+                        data: [31, 5],
+                        backgroundColor: ['#eab308', '#f1f5f9'],
+                        borderColor: ['#fff', '#e2e8f0'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}s drained` } }
+                    }
+                },
+                plugins: [{
+                    id: 'textCenter',
+                    beforeDraw: function(chart) {
+                        var width = chart.width,
+                            height = chart.height,
+                            ctx = chart.ctx;
+
+                        ctx.restore();
+                        var fontSize = (height / 114).toFixed(2);
+                        ctx.font = "bold " + fontSize + "em Inter";
+                        ctx.textBaseline = "middle";
+                        ctx.fillStyle = "#0f172a";
+
+                        var text = "31s",
+                            textX = Math.round((width - ctx.measureText(text).width) / 2),
+                            textY = height / 2 - 10;
+
+                        ctx.fillText(text, textX, textY);
+                        
+                        ctx.font = "normal " + (fontSize*0.4).toFixed(2) + "em Inter";
+                        ctx.fillStyle = "#64748b";
+                        var text2 = "Held",
+                            text2X = Math.round((width - ctx.measureText(text2).width) / 2),
+                            text2Y = height / 2 + 15;
+                        ctx.fillText(text2, text2X, text2Y);
+                        ctx.save();
+                    }
+                }]
+            });
+        }
+
+        // --- Interaction Logic ---
+        function switchTab(tabId) {
+            // Update buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            // Update views
+            document.getElementById('view-overview').classList.add('hidden');
+            document.getElementById('view-players').classList.add('hidden');
+            
+            const activeView = document.getElementById(`view-${tabId}`);
+            activeView.classList.remove('hidden');
+
+            // Render charts based on visible tab to ensure correct canvas sizing
+            if (tabId === 'overview') {
+                renderOverviewCharts();
+            } else if (tabId === 'players') {
+                renderPlayerCharts();
+            }
+        }
+
+        // Initialize default view
+        document.addEventListener('DOMContentLoaded', () => {
+            renderOverviewCharts(); // Render default tab charts
+            
+            // Adding a simple fade-in animation class via Tailwind config equivalent
+            const style = document.createElement('style');
+            style.innerHTML = `
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+            `;
+            document.head.appendChild(style);
+        });
+
+    </script>
+</body>
+</html>
